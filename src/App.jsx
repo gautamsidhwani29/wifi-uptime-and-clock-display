@@ -74,6 +74,82 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!("wakeLock" in navigator)) return undefined;
+
+    let wakeLock = null;
+    let requestInProgress = false;
+    let unmounted = false;
+
+    const releaseWakeLock = async () => {
+      if (!wakeLock) return;
+
+      const activeLock = wakeLock;
+      wakeLock = null;
+      activeLock.removeEventListener("release", handleRelease);
+
+      try {
+        await activeLock.release();
+      } catch {
+        // A lock can already have been released by the browser or Android.
+      }
+    };
+
+    const requestWakeLock = async () => {
+      if (
+        unmounted ||
+        document.visibilityState !== "visible" ||
+        wakeLock ||
+        requestInProgress
+      ) {
+        return;
+      }
+
+      requestInProgress = true;
+
+      try {
+        const newLock = await navigator.wakeLock.request("screen");
+
+        if (unmounted || document.visibilityState !== "visible") {
+          await newLock.release();
+          return;
+        }
+
+        wakeLock = newLock;
+        wakeLock.addEventListener("release", handleRelease);
+      } catch {
+        // Unsupported policies, low battery, and denied requests fail silently.
+      } finally {
+        requestInProgress = false;
+      }
+    };
+
+    const handleRelease = () => {
+      wakeLock = null;
+
+      if (!unmounted && document.visibilityState === "visible") {
+        requestWakeLock();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+      } else {
+        releaseWakeLock();
+      }
+    };
+
+    requestWakeLock();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      unmounted = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      releaseWakeLock();
+    };
+  }, []);
+
   // A real request catches captive portals and lost internet connections that
   // navigator.onLine alone cannot reliably detect.
   useEffect(() => {
