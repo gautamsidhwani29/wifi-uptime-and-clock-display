@@ -76,6 +76,7 @@ body {
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .clock h1 {

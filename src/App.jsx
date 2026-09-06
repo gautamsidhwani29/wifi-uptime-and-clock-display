@@ -630,6 +630,7 @@ function App() {
         onPointerUp={cancelClockHold}
         onPointerCancel={cancelClockHold}
         onPointerLeave={cancelClockHold}
+        onContextMenu={(event) => event.preventDefault()}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
