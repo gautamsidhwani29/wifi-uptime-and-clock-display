@@ -105,6 +105,7 @@ body {
 }
 
 .metric-card {
+  position: relative;
   min-height: 226px;
   padding: clamp(28px, 3.4vw, 38px);
   border-radius: 26px;
@@ -132,6 +133,34 @@ body {
 }
 
 .temperature-value { white-space: nowrap; }
+
+.temperature-card {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.temperature-detail-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  padding: clamp(28px, 3.4vw, 38px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: inherit;
+  background: rgba(18, 23, 33, 0.96);
+  color: var(--text);
+  font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+  font-weight: 500;
+  animation: temperature-detail-in 180ms ease-out;
+}
+
+@keyframes temperature-detail-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 .metric-heading {
   display: flex;
@@ -234,6 +263,120 @@ body {
 .uptime-legend i.online { background: var(--green); }
 .uptime-legend i.offline { background: var(--red); }
 
+.pomodoro-screen {
+  position: relative;
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: clamp(28px, 5vw, 72px);
+  background: radial-gradient(circle at 50% 42%, rgba(74, 99, 159, 0.22), transparent 36rem), var(--canvas);
+}
+
+.pomodoro-screen.break {
+  background: radial-gradient(circle at 50% 42%, rgba(77, 154, 125, 0.2), transparent 36rem), var(--canvas);
+}
+
+.pomodoro-topbar {
+  position: absolute;
+  top: clamp(24px, 4vw, 52px);
+  right: clamp(24px, 4vw, 52px);
+  left: clamp(24px, 4vw, 52px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.pomodoro-topbar .connection-status {
+  min-height: 58px;
+  padding: 0 20px;
+  font-size: 1.05rem;
+}
+
+.pomodoro-current-time {
+  color: var(--text);
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  font-weight: 300;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pomodoro-exit {
+  position: absolute;
+  top: clamp(96px, 11vw, 140px);
+  left: clamp(24px, 4vw, 52px);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.pomodoro-panel { text-align: center; }
+
+.pomodoro-phase {
+  margin: 0;
+  color: var(--green);
+  font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pomodoro-screen.break .pomodoro-phase { color: var(--yellow); }
+
+.pomodoro-time {
+  margin: 18px 0 42px;
+  color: var(--text);
+  font-size: clamp(7rem, 19vw, 16rem);
+  font-weight: 300;
+  line-height: 0.88;
+  letter-spacing: -0.07em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pomodoro-controls, .pomodoro-settings {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pomodoro-controls button {
+  min-width: 130px;
+  min-height: 54px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pomodoro-settings { margin-top: 34px; }
+
+.pomodoro-settings label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pomodoro-settings input {
+  width: 92px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.2rem;
+  padding: 9px 12px;
+}
+
 @media (max-width: 640px) {
   .dashboard { padding: 20px; }
 
@@ -251,6 +394,10 @@ body {
   .metrics { grid-template-columns: 1fr; }
   .metric-card { min-height: 178px; border-radius: 18px; }
   .metric-value { font-size: 4rem; }
+
+  .pomodoro-time { font-size: clamp(5.5rem, 24vw, 8rem); }
+  .pomodoro-topbar .connection-status { min-height: 46px; padding: 0 13px; font-size: 0.82rem; }
+  .pomodoro-current-time { font-size: 2.2rem; }
 
   .uptime-card { padding: 18px; }
   .uptime-heading { display: block; }

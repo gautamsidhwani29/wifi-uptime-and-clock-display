@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BatteryCharging, Wifi } from "lucide-react";
 import "./App.css";
 
@@ -8,6 +8,12 @@ const UPTIME_WINDOW_MS = 24 * 60 * 60 * 1000;
 const UPTIME_STORAGE_KEY = "ambient-dashboard-uptime-history";
 const UPTIME_COLUMNS = 48;
 const CLOCK_FORMAT_STORAGE_KEY = "ambient-dashboard-clock-format";
+const WEATHER_RETRY_DELAYS_MS = [1000, 3000, 7000];
+const SELF_HEAL_AFTER_MS = 45 * 60 * 1000;
+const SELF_HEAL_CHECK_MS = 5 * 60 * 1000;
+const FULL_REFRESH_MS = 6 * 60 * 60 * 1000;
+const TEMPERATURE_DETAIL_MS = 5000;
+const CLOCK_HOLD_MS = 800;
 
 function readingState() {
   return { status: "loading", value: null };
@@ -69,6 +75,31 @@ function loadClockFormat() {
   }
 }
 
+function wait(delay) {
+  return new Promise((resolve) => window.setTimeout(resolve, delay));
+}
+
+async function fetchWithRetry(url, source, readValue) {
+  for (let attempt = 0; attempt <= WEATHER_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const value = await readValue(await response.json());
+      console.info(`[dashboard] ${source} fetch succeeded`, new Date().toISOString());
+      return value;
+    } catch (error) {
+      if (attempt === WEATHER_RETRY_DELAYS_MS.length) {
+        console.error(`[dashboard] ${source} unavailable after retries`, error);
+        throw error;
+      }
+
+      const delay = WEATHER_RETRY_DELAYS_MS[attempt];
+      console.warn(`[dashboard] ${source} fetch failed; retrying in ${delay}ms`, error);
+      await wait(delay);
+    }
+  }
+}
+
 function App() {
   const [time, setTime] = useState(new Date());
   const [use24HourClock, setUse24HourClock] = useState(loadClockFormat);
@@ -76,12 +107,34 @@ function App() {
   const [battery, setBattery] = useState(null);
   const [isCharging, setIsCharging] = useState(false);
   const [temperature, setTemperature] = useState(initialLocationReading);
+  const [weatherDetails, setWeatherDetails] = useState(readingState);
   const [aqi, setAqi] = useState(initialLocationReading);
   const [uptimeHistory, setUptimeHistory] = useState(loadUptimeHistory);
+  const [showTemperatureDetails, setShowTemperatureDetails] = useState(false);
+  const [mode, setMode] = useState("ambient");
+  const [pomodoroPhase, setPomodoroPhase] = useState("work");
+  const [workMinutes, setWorkMinutes] = useState(25);
+  const [breakMinutes, setBreakMinutes] = useState(5);
+  const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60);
+  const [pomodoroRunning, setPomodoroRunning] = useState(false);
+  const refreshReadingsRef = useRef(null);
+  const connectivityRef = useRef("checking");
+  const lastSuccessfulUpdateRef = useRef(null);
+  const temperatureDetailTimerRef = useRef(null);
+  const clockHoldTimerRef = useRef(null);
+
+  const markSuccessfulUpdate = useCallback((source) => {
+    lastSuccessfulUpdateRef.current = Date.now();
+    console.info(`[dashboard] ${source} updated`, new Date().toISOString());
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    lastSuccessfulUpdateRef.current = Date.now();
   }, []);
 
   useEffect(() => {
@@ -127,8 +180,9 @@ function App() {
 
         wakeLock = newLock;
         wakeLock.addEventListener("release", handleRelease);
-      } catch {
-        // Unsupported policies, low battery, and denied requests fail silently.
+        console.info("[dashboard] screen wake lock acquired");
+      } catch (error) {
+        console.warn("[dashboard] screen wake lock request failed", error);
       } finally {
         requestInProgress = false;
       }
@@ -136,6 +190,7 @@ function App() {
 
     const handleRelease = () => {
       wakeLock = null;
+      console.warn("[dashboard] screen wake lock released");
 
       if (!unmounted && document.visibilityState === "visible") {
         requestWakeLock();
@@ -160,14 +215,25 @@ function App() {
     };
   }, []);
 
-  // A real request catches captive portals and lost internet connections that
-  // navigator.onLine alone cannot reliably detect.
   useEffect(() => {
     let activeController;
 
     const recordConnectivity = (status) => {
       const timestamp = Date.now();
+      const previousStatus = connectivityRef.current;
+      connectivityRef.current = status;
       setConnectivity(status);
+
+      if (status === "online") {
+        markSuccessfulUpdate("wifi");
+        if (previousStatus !== "online") {
+          console.info("[dashboard] connectivity restored; refreshing live data");
+          refreshReadingsRef.current?.();
+        }
+      } else {
+        console.warn("[dashboard] connectivity check failed", new Date(timestamp).toISOString());
+      }
+
       setUptimeHistory((history) => {
         const nextHistory = [
           ...history.filter((point) => point.timestamp >= timestamp - UPTIME_WINDOW_MS),
@@ -220,7 +286,7 @@ function App() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, []);
+  }, [markSuccessfulUpdate]);
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -233,13 +299,14 @@ function App() {
     const loadReadings = async (position) => {
       const { latitude, longitude } = position.coords;
       setTemperature(readingState());
+      setWeatherDetails(readingState());
       setAqi(readingState());
 
       const weatherUrl = new URL("https://api.open-meteo.com/v1/forecast");
       weatherUrl.search = new URLSearchParams({
         latitude: String(latitude),
         longitude: String(longitude),
-        current: "temperature_2m",
+        current: "temperature_2m,apparent_temperature,relative_humidity_2m",
         temperature_unit: "celsius",
       });
 
@@ -251,16 +318,22 @@ function App() {
       });
 
       const [weatherResult, aqiResult] = await Promise.allSettled([
-        fetch(weatherUrl, { cache: "no-store" }).then(async (response) => {
-          if (!response.ok) throw new Error("Weather request failed");
-          const data = await response.json();
-          const value = data.current?.temperature_2m;
-          if (!Number.isFinite(value)) throw new Error("Weather value unavailable");
-          return Math.round(value);
+        fetchWithRetry(weatherUrl, "weather", (data) => {
+          const current = data.current;
+          if (
+            !Number.isFinite(current?.temperature_2m) ||
+            !Number.isFinite(current?.apparent_temperature) ||
+            !Number.isFinite(current?.relative_humidity_2m)
+          ) {
+            throw new Error("Weather value unavailable");
+          }
+          return {
+            temperature: Math.round(current.temperature_2m),
+            apparentTemperature: Math.round(current.apparent_temperature),
+            humidity: Math.round(current.relative_humidity_2m),
+          };
         }),
-        fetch(airQualityUrl, { cache: "no-store" }).then(async (response) => {
-          if (!response.ok) throw new Error("Air-quality request failed");
-          const data = await response.json();
+        fetchWithRetry(airQualityUrl, "AQI", (data) => {
           const value = data.current?.us_aqi;
           if (!Number.isFinite(value)) throw new Error("AQI value unavailable");
           return Math.round(value);
@@ -271,6 +344,11 @@ function App() {
 
       setTemperature(
         weatherResult.status === "fulfilled"
+          ? { status: "available", value: weatherResult.value.temperature }
+          : { status: "unavailable", value: null },
+      );
+      setWeatherDetails(
+        weatherResult.status === "fulfilled"
           ? { status: "available", value: weatherResult.value }
           : { status: "unavailable", value: null },
       );
@@ -279,6 +357,9 @@ function App() {
           ? { status: "available", value: aqiResult.value }
           : { status: "unavailable", value: null },
       );
+
+      if (weatherResult.status === "fulfilled") markSuccessfulUpdate("weather");
+      if (aqiResult.status === "fulfilled") markSuccessfulUpdate("AQI");
     };
 
     const requestLocation = () => {
@@ -287,7 +368,9 @@ function App() {
         () => {
           if (!cancelled) {
             setTemperature({ status: "unavailable", value: null });
+            setWeatherDetails({ status: "unavailable", value: null });
             setAqi({ status: "unavailable", value: null });
+            console.error("[dashboard] location request failed; weather and AQI unavailable");
           }
         },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
@@ -295,13 +378,15 @@ function App() {
     };
 
     requestLocation();
+    refreshReadingsRef.current = requestLocation;
     timer = window.setInterval(requestLocation, WEATHER_REFRESH_MS);
 
     return () => {
       cancelled = true;
+      refreshReadingsRef.current = null;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [markSuccessfulUpdate]);
 
   useEffect(() => {
     if (!("getBattery" in navigator)) return undefined;
@@ -334,6 +419,54 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const checkHealth = () => {
+      if (lastSuccessfulUpdateRef.current === null) return;
+      const idleFor = Date.now() - lastSuccessfulUpdateRef.current;
+      if (document.visibilityState === "visible" && idleFor >= SELF_HEAL_AFTER_MS) {
+        console.warn("[dashboard] no successful live update; reloading", { idleFor });
+        window.location.reload();
+      }
+    };
+
+    const timer = window.setInterval(checkHealth, SELF_HEAL_CHECK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      console.info("[dashboard] scheduled full refresh");
+      window.location.reload();
+    }, FULL_REFRESH_MS);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(temperatureDetailTimerRef.current);
+      window.clearTimeout(clockHoldTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "pomodoro" || !pomodoroRunning) return undefined;
+
+    const timer = window.setTimeout(() => {
+      if (pomodoroSeconds <= 1) {
+        const nextPhase = pomodoroPhase === "work" ? "break" : "work";
+        const nextDuration = nextPhase === "work" ? workMinutes : breakMinutes;
+        setPomodoroPhase(nextPhase);
+        setPomodoroSeconds(nextDuration * 60);
+        console.info(`[dashboard] Pomodoro switched to ${nextPhase}`);
+      } else {
+        setPomodoroSeconds((seconds) => seconds - 1);
+      }
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [breakMinutes, mode, pomodoroPhase, pomodoroRunning, pomodoroSeconds, workMinutes]);
+
   const toggleClockFormat = () => {
     setUse24HourClock((currentFormat) => {
       const nextFormat = !currentFormat;
@@ -346,11 +479,51 @@ function App() {
     });
   };
 
-  const formattedTime = time.toLocaleTimeString([], {
-    hour: use24HourClock ? "2-digit" : "numeric",
-    minute: "2-digit",
-    hour12: !use24HourClock,
-  });
+  const revealTemperatureDetails = () => {
+    if (weatherDetails.status !== "available") return;
+
+    setShowTemperatureDetails(true);
+    window.clearTimeout(temperatureDetailTimerRef.current);
+    temperatureDetailTimerRef.current = window.setTimeout(() => {
+      setShowTemperatureDetails(false);
+    }, TEMPERATURE_DETAIL_MS);
+  };
+
+  const startClockHold = () => {
+    window.clearTimeout(clockHoldTimerRef.current);
+    clockHoldTimerRef.current = window.setTimeout(() => {
+      setMode("pomodoro");
+      console.info("[dashboard] entered Pomodoro mode");
+    }, CLOCK_HOLD_MS);
+  };
+
+  const cancelClockHold = () => window.clearTimeout(clockHoldTimerRef.current);
+
+  const resetPomodoro = () => {
+    setPomodoroRunning(false);
+    setPomodoroPhase("work");
+    setPomodoroSeconds(workMinutes * 60);
+  };
+
+  const updatePomodoroDuration = (type, rawValue) => {
+    const minutes = Math.min(120, Math.max(1, Number.parseInt(rawValue, 10) || 1));
+    if (type === "work") {
+      setWorkMinutes(minutes);
+      if (pomodoroPhase === "work") setPomodoroSeconds(minutes * 60);
+    } else {
+      setBreakMinutes(minutes);
+      if (pomodoroPhase === "break") setPomodoroSeconds(minutes * 60);
+    }
+    setPomodoroRunning(false);
+  };
+
+  const formattedTime = time
+    .toLocaleTimeString([], {
+      hour: use24HourClock ? "2-digit" : "numeric",
+      minute: "2-digit",
+      hour12: !use24HourClock,
+    })
+    .replace(/\b([ap])\.?m\.?\b/i, (_, period) => `${period.toUpperCase()}M`);
   const formattedDate = time.toLocaleDateString([], {
     weekday: "long",
     day: "numeric",
@@ -374,6 +547,65 @@ function App() {
     const latestSample = samples.at(-1);
     return { start, status: latestSample?.status ?? "unknown" };
   });
+  const pomodoroTime = `${String(Math.floor(pomodoroSeconds / 60)).padStart(2, "0")}:${String(
+    pomodoroSeconds % 60,
+  ).padStart(2, "0")}`;
+
+  if (mode === "pomodoro") {
+    return (
+      <main className={`pomodoro-screen ${pomodoroPhase}`}>
+        <header className="pomodoro-topbar">
+          <div className={`connection-status ${connectivity}`} title={connectionLabel}>
+            <Wifi size={30} strokeWidth={2} />
+            <span>{connectionLabel}</span>
+          </div>
+          <time className="pomodoro-current-time">{formattedTime}</time>
+        </header>
+        <button
+          className="pomodoro-exit"
+          type="button"
+          onClick={() => {
+            setPomodoroRunning(false);
+            setMode("ambient");
+          }}
+        >
+          Back to dashboard
+        </button>
+        <section className="pomodoro-panel" aria-live="polite">
+          <p className="pomodoro-phase">{pomodoroPhase === "work" ? "Focus" : "Break"}</p>
+          <p className="pomodoro-time">{pomodoroTime}</p>
+          <div className="pomodoro-controls">
+            <button type="button" onClick={() => setPomodoroRunning((running) => !running)}>
+              {pomodoroRunning ? "Pause" : "Start"}
+            </button>
+            <button type="button" onClick={resetPomodoro}>Reset</button>
+          </div>
+          <div className="pomodoro-settings">
+            <label>
+              Focus
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={workMinutes}
+                onChange={(event) => updatePomodoroDuration("work", event.target.value)}
+              />
+            </label>
+            <label>
+              Break
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={breakMinutes}
+                onChange={(event) => updatePomodoroDuration("break", event.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="dashboard">
@@ -394,6 +626,10 @@ function App() {
       <section
         className="clock"
         onDoubleClick={toggleClockFormat}
+        onPointerDown={startClockHold}
+        onPointerUp={cancelClockHold}
+        onPointerCancel={cancelClockHold}
+        onPointerLeave={cancelClockHold}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
@@ -402,18 +638,36 @@ function App() {
         }}
         role="button"
         tabIndex="0"
-        aria-label="Clock. Double tap to switch between 12-hour and 24-hour time."
+        aria-label="Clock. Double tap to switch between 12-hour and 24-hour time. Hold to open Pomodoro mode."
       >
         <h1>{formattedTime}</h1>
         <p>{formattedDate}</p>
       </section>
 
       <section className="metrics" aria-live="polite">
-        <article className="metric-card temperature-card">
+        <article
+          className="metric-card temperature-card"
+          onClick={revealTemperatureDetails}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              revealTemperatureDetails();
+            }
+          }}
+          role="button"
+          tabIndex="0"
+          aria-label="Outdoor temperature. Tap for feels-like temperature and humidity."
+        >
           <p className="metric-label">Outdoor temperature</p>
           <div className="metric-value temperature-value">
             {displayReading(temperature, (value) => `${value}°`)}
           </div>
+          {showTemperatureDetails && weatherDetails.status === "available" && (
+            <div className="temperature-detail-overlay">
+              <span>Feels like {weatherDetails.value.apparentTemperature}°</span>
+              <span>Humidity {weatherDetails.value.humidity}%</span>
+            </div>
+          )}
         </article>
 
         <article className="metric-card aqi-card">
