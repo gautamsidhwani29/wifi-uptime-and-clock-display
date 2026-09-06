@@ -73,6 +73,9 @@ body {
 .clock {
   padding: clamp(34px, 6vh, 68px) 0 clamp(52px, 8vh, 94px);
   text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .clock h1 {

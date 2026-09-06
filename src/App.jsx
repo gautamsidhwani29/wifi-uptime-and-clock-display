@@ -7,6 +7,7 @@ const CONNECTIVITY_REFRESH_MS = 30 * 1000;
 const UPTIME_WINDOW_MS = 24 * 60 * 60 * 1000;
 const UPTIME_STORAGE_KEY = "ambient-dashboard-uptime-history";
 const UPTIME_COLUMNS = 48;
+const CLOCK_FORMAT_STORAGE_KEY = "ambient-dashboard-clock-format";
 
 function readingState() {
   return { status: "loading", value: null };
@@ -60,8 +61,17 @@ function uptimeSummary(history) {
   return Math.round((onlineChecks / history.length) * 100);
 }
 
+function loadClockFormat() {
+  try {
+    return window.localStorage.getItem(CLOCK_FORMAT_STORAGE_KEY) === "24";
+  } catch {
+    return false;
+  }
+}
+
 function App() {
   const [time, setTime] = useState(new Date());
+  const [use24HourClock, setUse24HourClock] = useState(loadClockFormat);
   const [connectivity, setConnectivity] = useState("checking");
   const [battery, setBattery] = useState(null);
   const [isCharging, setIsCharging] = useState(false);
@@ -324,7 +334,23 @@ function App() {
     };
   }, []);
 
-  const formattedTime = time.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const toggleClockFormat = () => {
+    setUse24HourClock((currentFormat) => {
+      const nextFormat = !currentFormat;
+      try {
+        window.localStorage.setItem(CLOCK_FORMAT_STORAGE_KEY, nextFormat ? "24" : "12");
+      } catch {
+        // The format still changes for this session if storage is unavailable.
+      }
+      return nextFormat;
+    });
+  };
+
+  const formattedTime = time.toLocaleTimeString([], {
+    hour: use24HourClock ? "2-digit" : "numeric",
+    minute: "2-digit",
+    hour12: !use24HourClock,
+  });
   const formattedDate = time.toLocaleDateString([], {
     weekday: "long",
     day: "numeric",
@@ -365,7 +391,19 @@ function App() {
         )}
       </header>
 
-      <section className="clock">
+      <section
+        className="clock"
+        onDoubleClick={toggleClockFormat}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleClockFormat();
+          }
+        }}
+        role="button"
+        tabIndex="0"
+        aria-label="Clock. Double tap to switch between 12-hour and 24-hour time."
+      >
         <h1>{formattedTime}</h1>
         <p>{formattedDate}</p>
       </section>
