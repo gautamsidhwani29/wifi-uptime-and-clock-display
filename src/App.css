@@ -47,20 +47,20 @@ body {
   align-items: center;
   justify-content: center;
   gap: 24px;
-  min-height: 84px;
+  min-height: 100px;
 }
 
 .connection-status, .battery-status {
   display: inline-flex;
   align-items: center;
-  gap: 16px;
-  min-height: 84px;
-  padding: 0 32px;
+  gap: 20px;
+  min-height: 100px;
+  padding: 0 40px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.035);
   color: var(--muted);
-  font-size: 1.45rem;
+  font-size: 1.9rem;
   font-weight: 550;
   letter-spacing: 0.01em;
 }
@@ -70,8 +70,13 @@ body {
 .connection-status.checking { color: var(--yellow); }
 .battery-status.charging { color: var(--text); }
 
+.offline-duration {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
 .clock {
-  padding: clamp(34px, 6vh, 68px) 0 clamp(52px, 8vh, 94px);
+  padding: clamp(40px, 6vh, 72px) 0 clamp(56px, 8vh, 96px);
   text-align: center;
   cursor: pointer;
   touch-action: manipulation;
@@ -82,7 +87,7 @@ body {
 .clock h1 {
   margin: 0;
   color: var(--text);
-  font-size: clamp(6.5rem, 15vw, 13rem);
+  font-size: clamp(9rem, 22vw, 20rem);
   font-weight: 300;
   line-height: 0.88;
   letter-spacing: -0.075em;
@@ -90,9 +95,9 @@ body {
 }
 
 .clock p {
-  margin: 40px 0 0;
+  margin: 44px 0 0;
   color: var(--muted);
-  font-size: clamp(2rem, 4.25vw, 3rem);
+  font-size: clamp(2.4rem, 5vw, 4rem);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -100,16 +105,16 @@ body {
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-  width: min(100%, 900px);
+  gap: 24px;
+  width: min(100%, 1100px);
   margin: 0 auto;
 }
 
 .metric-card {
   position: relative;
-  min-height: 226px;
-  padding: clamp(28px, 3.4vw, 38px);
-  border-radius: 26px;
+  min-height: 280px;
+  padding: clamp(32px, 3.4vw, 48px);
+  border-radius: 30px;
   background: var(--surface);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
 }
@@ -117,16 +122,16 @@ body {
 .metric-label {
   margin: 0;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .metric-value {
-  margin-top: 22px;
+  margin-top: 24px;
   color: var(--text);
-  font-size: clamp(3.6rem, 7vw, 5.4rem);
+  font-size: clamp(5rem, 10vw, 8rem);
   font-weight: 300;
   line-height: 0.9;
   letter-spacing: -0.055em;
@@ -147,13 +152,13 @@ body {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 12px;
-  padding: clamp(28px, 3.4vw, 38px);
+  gap: 16px;
+  padding: clamp(32px, 3.4vw, 48px);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: inherit;
   background: rgba(18, 23, 33, 0.96);
   color: var(--text);
-  font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
   font-weight: 500;
   animation: temperature-detail-in 180ms ease-out;
 }
@@ -171,11 +176,11 @@ body {
 
 .aqi-dot {
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--subtle);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.045);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.045);
 }
 
 .aqi-dot.good { background: var(--green); box-shadow: 0 0 0 4px rgba(94, 230, 157, 0.14); }
@@ -185,18 +190,18 @@ body {
 
 .metric-detail {
   min-height: 1.3em;
-  margin: 18px 0 0;
+  margin: 20px 0 0;
   color: var(--subtle);
-  font-size: 1.05rem;
+  font-size: 1.35rem;
   font-weight: 500;
 }
 
 .uptime-card {
-  width: min(100%, 900px);
-  margin: 20px auto 0;
-  padding: 24px 28px 22px;
+  width: min(100%, 1100px);
+  margin: 24px auto 0;
+  padding: 28px 32px 26px;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: 26px;
   background: rgba(24, 29, 40, 0.6);
 }
 
@@ -207,10 +212,17 @@ body {
   gap: 18px;
 }
 
+.uptime-heading-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
 .uptime-period, .uptime-summary {
   margin: 6px 0 0;
   color: var(--subtle);
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   font-weight: 500;
 }
 
@@ -218,13 +230,40 @@ body {
   color: var(--muted);
   text-align: right;
   white-space: nowrap;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.uptime-view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+.uptime-view-toggle span {
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: var(--subtle);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 150ms, color 150ms;
+  white-space: nowrap;
+}
+
+.uptime-view-toggle span.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
 }
 
 .uptime-graph {
   display: grid;
-  grid-template-columns: repeat(48, minmax(0, 1fr));
-  gap: 3px;
-  height: 46px;
+  gap: 4px;
+  height: 60px;
   margin-top: 24px;
 }
 
@@ -263,6 +302,140 @@ body {
 
 .uptime-legend i.online { background: var(--green); }
 .uptime-legend i.offline { background: var(--red); }
+
+/* Outage event log */
+.outage-log {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.outage-log-title {
+  margin: 0 0 10px;
+  color: var(--subtle);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.outage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.outage-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.outage-item.active {
+  background: rgba(245, 107, 120, 0.08);
+}
+
+.outage-time {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.outage-duration {
+  color: var(--subtle);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.outage-item.active .outage-duration {
+  color: var(--red);
+}
+
+/* Ping target settings */
+.ping-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.ping-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--subtle);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 0.04em;
+}
+
+.ping-settings-toggle:hover { color: var(--muted); }
+
+.ping-target-label {
+  color: var(--subtle);
+  font-size: 0.78rem;
+  font-family: ui-monospace, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.ping-settings-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.ping-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-family: ui-monospace, monospace;
+}
+
+.ping-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ping-save, .ping-reset {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ping-reset { color: var(--subtle); }
 
 .pomodoro-screen {
   display: flex;
@@ -392,8 +565,8 @@ body {
   .clock p { margin-top: 18px; }
 
   .metrics { grid-template-columns: 1fr; }
-  .metric-card { min-height: 178px; border-radius: 18px; }
-  .metric-value { font-size: 4rem; }
+  .metric-card { min-height: 200px; border-radius: 20px; }
+  .metric-value { font-size: clamp(4rem, 18vw, 6rem); }
 
   .pomodoro-time { font-size: clamp(5.5rem, 24vw, 8rem); }
   .pomodoro-topbar .connection-status { min-height: 46px; padding: 0 13px; font-size: 0.82rem; }
@@ -401,6 +574,11 @@ body {
 
   .uptime-card { padding: 18px; }
   .uptime-heading { display: block; }
+  .uptime-heading-right { align-items: flex-start; margin-top: 10px; }
   .uptime-summary { text-align: left; }
   .uptime-graph { height: 28px; gap: 2px; }
+
+  .ping-target-label { max-width: 160px; }
+  .ping-settings-panel { flex-direction: column; align-items: stretch; }
+  .ping-input { min-width: unset; }
 }
