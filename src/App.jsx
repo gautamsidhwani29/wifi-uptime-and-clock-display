@@ -128,6 +128,11 @@ function App() {
     console.info(`[dashboard] ${source} updated`, new Date().toISOString());
   }, []);
 
+  const reloadWhenSafe = useCallback((reason) => {
+    console.info(`[dashboard] ${reason}; refreshing data in place`);
+    refreshReadingsRef.current?.();
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -424,23 +429,25 @@ function App() {
       if (lastSuccessfulUpdateRef.current === null) return;
       const idleFor = Date.now() - lastSuccessfulUpdateRef.current;
       if (document.visibilityState === "visible" && idleFor >= SELF_HEAL_AFTER_MS) {
-        console.warn("[dashboard] no successful live update; reloading", { idleFor });
-        window.location.reload();
+        console.warn("[dashboard] no successful live update", { idleFor });
+        reloadWhenSafe("self-healing reload");
       }
     };
 
     const timer = window.setInterval(checkHealth, SELF_HEAL_CHECK_MS);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [reloadWhenSafe]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      console.info("[dashboard] scheduled full refresh");
-      window.location.reload();
-    }, FULL_REFRESH_MS);
+    const timer = window.setTimeout(
+      () => reloadWhenSafe("scheduled full refresh"),
+      FULL_REFRESH_MS,
+    );
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [reloadWhenSafe]);
+
+
 
   useEffect(() => {
     return () => {
